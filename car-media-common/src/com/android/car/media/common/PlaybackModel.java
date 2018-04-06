@@ -29,7 +29,9 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.media.MediaMetadata;
+import android.media.Rating;
 import android.media.session.MediaController;
+import android.media.session.MediaController.TransportControls;
 import android.media.session.MediaSession;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
@@ -61,6 +63,10 @@ import java.util.stream.Collectors;
  */
 public class PlaybackModel {
     private static final String TAG = "PlaybackModel";
+
+    private static final String ACTION_SET_RATING =
+            "com.android.car.media.common.ACTION_SET_RATING";
+    private static final String EXTRA_SET_HEART = "com.android.car.media.common.EXTRA_SET_HEART";
 
     private final MediaSessionManager mMediaSessionManager;
     @Nullable
@@ -252,19 +258,19 @@ public class PlaybackModel {
         if (metadata == null) {
             return null;
         }
-        return new MediaItemMetadata(mContext, metadata);
+        return new MediaItemMetadata(metadata);
     }
 
     /**
-     * @return an integer representing the maximum value for the progress bar corresponding on the
-     * current position in the media item, which can be obtained by calling {@link #getProgress()}.
+     * @return duration of the media item, in milliseconds. The current position in this duration
+     * can be obtained by calling {@link #getProgress()}.
      * Changes on this value will be notified through {@link PlaybackObserver#onMetadataChanged()}
      */
-    public int getMaxProgress() {
+    public long getMaxProgress() {
         if (mMediaController == null || mMediaController.getMetadata() == null) {
             return 0;
         } else {
-            return (int) mMediaController.getMetadata()
+            return mMediaController.getMetadata()
                     .getLong(MediaMetadata.METADATA_KEY_DURATION);
         }
     }
@@ -321,13 +327,23 @@ public class PlaybackModel {
      * @param extras additional data to send to the media source.
      */
     public void onCustomAction(String action, Bundle extras) {
+        if (mMediaController == null) return;
+        TransportControls cntrl = mMediaController.getTransportControls();
+
+        if (ACTION_SET_RATING.equals(action)) {
+            boolean setHeart = extras != null && extras.getBoolean(EXTRA_SET_HEART, false);
+            cntrl.setRating(Rating.newHeartRating(setHeart));
+        } else {
+            cntrl.sendCustomAction(action, extras);
+        }
+
         if (mMediaController != null) {
             mMediaController.getTransportControls().sendCustomAction(action, extras);
         }
     }
 
     /**
-     * Starts playing a given media item. This id corresponds to {@link MediaItemMetadata#mId}.
+     * Starts playing a given media item. This id corresponds to {@link MediaItemMetadata#getId()}.
      */
     public void onPlayItem(String mediaItemId) {
         if (mMediaController != null) {
@@ -444,10 +460,10 @@ public class PlaybackModel {
     }
 
     /**
-     * @return the current playback progress. This is a value between 0 and
+     * @return the current playback progress, in milliseconds. This is a value between 0 and
      * {@link #getMaxProgress()}.
      */
-    public int getProgress() {
+    public long getProgress() {
         if (mMediaController == null) {
             return 0;
         }
@@ -463,7 +479,7 @@ public class PlaybackModel {
             speed = 0f;
         }
         long posDiff = (long) (timeDiff * speed);
-        return Math.min((int) (posDiff + state.getPosition()), getMaxProgress());
+        return Math.min(posDiff + state.getPosition(), getMaxProgress());
     }
 
     /**
@@ -548,7 +564,7 @@ public class PlaybackModel {
         List<MediaSession.QueueItem> items = mMediaController.getQueue();
         if (items != null) {
             return items.stream()
-                    .map(item -> new MediaItemMetadata(mContext, item))
+                    .map(MediaItemMetadata::new)
                     .collect(Collectors.toList());
         } else {
             return new ArrayList<>();
@@ -568,6 +584,30 @@ public class PlaybackModel {
         return items != null && !items.isEmpty();
     }
 
+    private @Nullable CustomPlaybackAction getRatingAction() {
+        PlaybackState playbackState = mMediaController.getPlaybackState();
+        if (playbackState == null) return null;
+
+        long stdActions = playbackState.getActions();
+        if ((stdActions & PlaybackState.ACTION_SET_RATING) == 0) return null;
+
+        int ratingType = mMediaController.getRatingType();
+        if (ratingType != Rating.RATING_HEART) return null;
+
+        MediaMetadata metadata = mMediaController.getMetadata();
+        boolean hasHeart = false;
+        if (metadata != null) {
+            Rating rating = metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING);
+            hasHeart = rating != null && rating.hasHeart();
+        }
+
+        int iconResource = hasHeart ? R.drawable.ic_star_filled : R.drawable.ic_star_empty;
+        Drawable icon = mContext.getResources().getDrawable(iconResource, null);
+        Bundle extras = new Bundle();
+        extras.putBoolean(EXTRA_SET_HEART, !hasHeart);
+        return new CustomPlaybackAction(icon, ACTION_SET_RATING, extras);
+    }
+
     /**
      * @return a sorted list of custom actions, as reported by the media source. Changes on this
      * value will be notified through
@@ -575,11 +615,14 @@ public class PlaybackModel {
      */
     public List<CustomPlaybackAction> getCustomActions() {
         List<CustomPlaybackAction> actions = new ArrayList<>();
-        if (mMediaController == null || mMediaController.getPlaybackState() == null) {
-            return actions;
-        }
-        for (PlaybackState.CustomAction action : mMediaController.getPlaybackState()
-                .getCustomActions()) {
+        if (mMediaController == null) return actions;
+        PlaybackState playbackState = mMediaController.getPlaybackState();
+        if (playbackState == null) return actions;
+
+        CustomPlaybackAction ratingAction = getRatingAction();
+        if (ratingAction != null) actions.add(ratingAction);
+
+        for (PlaybackState.CustomAction action : playbackState.getCustomActions()) {
             Resources resources = getResourcesForPackage(mMediaController.getPackageName());
             if (resources == null) {
                 actions.add(null);

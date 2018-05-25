@@ -40,6 +40,7 @@ import com.android.car.broadcastradio.support.platform.ImageResolver;
 import com.android.car.broadcastradio.support.platform.ProgramInfoExt;
 import com.android.car.broadcastradio.support.platform.ProgramSelectorExt;
 import com.android.car.broadcastradio.support.platform.RadioMetadataExt;
+import com.android.car.media.common.ContentStyleMediaConstants;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -96,6 +97,29 @@ public class BrowseTree {
      */
     public static final long BCRADIO_FOLDER_TYPE_BAND = 3;
 
+    /**
+     * Non-localized name of the band.
+     *
+     * For now, it can only take one of the following values:
+     *  - AM;
+     *  - FM;
+     *  - DAB;
+     *  - SXM.
+     *
+     * However, in future releases the list might get extended.
+     */
+    public static final String EXTRA_BCRADIO_BAND_NAME_EN =
+            "android.media.extra.EXTRA_BCRADIO_BAND_NAME_EN";
+
+    /**
+     * General play intent action.
+     *
+     * MediaBrowserService of the radio app must handle this command to perform general
+     * "play" command. It usually means starting playback of recently tuned station.
+     */
+    public static final String ACTION_PLAY_BROADCASTRADIO =
+            "android.car.intent.action.PLAY_BROADCASTRADIO";
+
     private static final String NODE_ROOT = "root_id";
     private static final String NODE_PROGRAMS = "programs_id";
     private static final String NODE_FAVORITES = "favorites_id";
@@ -113,9 +137,9 @@ public class BrowseTree {
     private List<MediaItem> mRootChildren;
 
     private final AmFmChannelList mAmChannels = new AmFmChannelList(
-            NODEPREFIX_BAND + "am", R.string.radio_am_text);
+            NODEPREFIX_BAND + "am", R.string.radio_am_text, "AM");
     private final AmFmChannelList mFmChannels = new AmFmChannelList(
-            NODEPREFIX_BAND + "fm", R.string.radio_fm_text);
+            NODEPREFIX_BAND + "fm", R.string.radio_fm_text, "FM");
 
     private final ProgramList.OnCompleteListener mProgramListCompleteListener =
             this::onProgramListUpdated;
@@ -150,9 +174,14 @@ public class BrowseTree {
     }
 
     private static MediaItem createFolder(MediaDescriptionCompat.Builder descBuilder,
-            String mediaId, String title, boolean isPlayable, long folderType) {
-        Bundle extras = new Bundle();
+            String mediaId, String title, boolean isPlayable, long folderType, Bundle extras) {
+        if (extras == null) extras = new Bundle();
         extras.putLong(EXTRA_BCRADIO_FOLDER_TYPE, folderType);
+        extras.putBoolean(ContentStyleMediaConstants.CONTENT_STYLE_SUPPORTED, true);
+        extras.putInt(ContentStyleMediaConstants.CONTENT_STYLE_PLAYABLE_HINT,
+                ContentStyleMediaConstants.CONTENT_STYLE_LIST_ITEM_HINT_VALUE);
+        extras.putInt(ContentStyleMediaConstants.CONTENT_STYLE_BROWSABLE_HINT,
+                ContentStyleMediaConstants.CONTENT_STYLE_LIST_ITEM_HINT_VALUE);
 
         MediaDescriptionCompat desc = descBuilder
                 .setMediaId(mediaId).setTitle(title).setExtras(extras).build();
@@ -318,12 +347,12 @@ public class BrowseTree {
             if (mProgramList != null) {
                 mRootChildren.add(createFolder(dbld, NODE_PROGRAMS,
                         mBrowserService.getString(R.string.program_list_text),
-                        false, BCRADIO_FOLDER_TYPE_PROGRAMS));
+                        false, BCRADIO_FOLDER_TYPE_PROGRAMS, null));
             }
             if (mFavorites != null) {
                 mRootChildren.add(createFolder(dbld, NODE_FAVORITES,
                         mBrowserService.getString(R.string.favorites_list_text),
-                        true, BCRADIO_FOLDER_TYPE_FAVORITES));
+                        true, BCRADIO_FOLDER_TYPE_FAVORITES, null));
             }
 
             MediaItem amRoot = mAmChannels.getBandRoot();
@@ -338,12 +367,15 @@ public class BrowseTree {
     private class AmFmChannelList {
         public final @NonNull String mMediaId;
         private final @StringRes int mBandName;
+        private final @NonNull String mBandNameEn;
         private @Nullable List<BandDescriptor> mBands;
         private @Nullable List<MediaItem> mChannels;
 
-        private AmFmChannelList(@NonNull String mediaId, @StringRes int bandName) {
+        private AmFmChannelList(@NonNull String mediaId, @StringRes int bandName,
+                @NonNull String bandNameEn) {
             mMediaId = Objects.requireNonNull(mediaId);
             mBandName = bandName;
+            mBandNameEn = Objects.requireNonNull(bandNameEn);
         }
 
         public void setBands(List<BandDescriptor> bands) {
@@ -364,8 +396,10 @@ public class BrowseTree {
 
         public @Nullable MediaItem getBandRoot() {
             if (isEmpty()) return null;
+            Bundle extras = new Bundle();
+            extras.putString(EXTRA_BCRADIO_BAND_NAME_EN, mBandNameEn);
             return createFolder(new MediaDescriptionCompat.Builder(), mMediaId,
-                    mBrowserService.getString(mBandName), true, BCRADIO_FOLDER_TYPE_BAND);
+                    mBrowserService.getString(mBandName), true, BCRADIO_FOLDER_TYPE_BAND, extras);
         }
 
         public List<MediaItem> getChannels() {

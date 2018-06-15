@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2018 The Android Open Source Project
+# Copyright (C) 2016 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,27 +14,18 @@
 # limitations under the License.
 #
 
-LOCAL_PATH := $(call my-dir)
+LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := car-broadcastradio-support
-
-LOCAL_SRC_FILES := $(call all-java-files-under, src)
-LOCAL_AIDL_INCLUDES := $(LOCAL_PATH)/src
-LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/res
-
-LOCAL_MODULE_TAGS := optional
-LOCAL_PRIVILEGED_MODULE := true
-
-LOCAL_PROGUARD_ENABLED := disabled
 LOCAL_USE_AAPT2 := true
 
-LOCAL_SHARED_ANDROID_LIBRARIES := \
-    androidx.legacy_legacy-support-v4
+LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/res
+
+LOCAL_MODULE := car-theme-lib
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_PROGUARD_ENABLED := disabled
+LOCAL_SDK_VERSION := current
 
 include $(BUILD_STATIC_JAVA_LIBRARY)
-
-ifeq ($(BOARD_IS_AUTOMOTIVE), true)
-$(call dist-for-goals,dist_files,$(full_classes_jar):$(LOCAL_MODULE).jar)
-endif

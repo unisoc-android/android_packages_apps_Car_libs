@@ -21,9 +21,9 @@ import static androidx.lifecycle.Transformations.map;
 import static com.android.car.arch.common.LiveDataFunctions.dataOf;
 import static com.android.car.arch.common.LiveDataFunctions.emitsNull;
 import static com.android.car.arch.common.LiveDataFunctions.ifThenElse;
+import static com.android.car.arch.common.LiveDataFunctions.loadingSwitchMap;
 import static com.android.car.arch.common.LiveDataFunctions.pair;
 import static com.android.car.arch.common.LiveDataFunctions.split;
-import static com.android.car.arch.common.LoadingSwitchMap.loadingSwitchMap;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -37,7 +37,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.android.car.arch.common.LoadingSwitchMap;
+import com.android.car.arch.common.FutureData;
 import com.android.car.arch.common.switching.SwitchingLiveData;
 import com.android.car.media.common.MediaItemMetadata;
 
@@ -57,8 +57,7 @@ public class MediaBrowserViewModelImpl extends AndroidViewModel implements
     private final MutableLiveData<String> mCurrentBrowseId = new MutableLiveData<>();
     private final MutableLiveData<String> mCurrentSearchQuery = dataOf(null);
 
-    private final LiveData<Boolean> mIsLoading;
-    private final LiveData<List<MediaItemMetadata>> mCurrentMediaItems;
+    private final LiveData<FutureData<List<MediaItemMetadata>>> mCurrentMediaItems;
 
     private final LiveData<BrowseState> mBrowseState;
 
@@ -67,27 +66,24 @@ public class MediaBrowserViewModelImpl extends AndroidViewModel implements
 
         LiveData<MediaBrowserCompat> connectedMediaBrowser = map(mMediaBrowserSwitch.asLiveData(),
                 MediaBrowserViewModelImpl::requireConnected);
-        LoadingSwitchMap<List<MediaItemMetadata>> currentBrowseItems =
+
+        LiveData<FutureData<List<MediaItemMetadata>>> currentBrowseItems =
                 loadingSwitchMap(pair(connectedMediaBrowser, mCurrentBrowseId),
                         split((mediaBrowser, browseId) ->
                                 mediaBrowser == null
                                         ? null
                                         : new BrowsedMediaItems(mediaBrowser, browseId)));
-        LoadingSwitchMap<List<MediaItemMetadata>> currentSearchItems =
+        LiveData<FutureData<List<MediaItemMetadata>>> currentSearchItems =
                 loadingSwitchMap(pair(connectedMediaBrowser, mCurrentSearchQuery),
                         split((mediaBrowser, query) ->
                                 mediaBrowser == null
                                         ? null
                                         : new SearchedMediaItems(mediaBrowser, query)));
-        mIsLoading = ifThenElse(emitsNull(mCurrentSearchQuery),
-                currentBrowseItems.isLoading(), currentSearchItems.isLoading());
         mCurrentMediaItems = ifThenElse(emitsNull(mCurrentSearchQuery),
-                currentBrowseItems.getOutput(), currentSearchItems.getOutput());
-
+                currentBrowseItems, currentSearchItems);
         mBrowseState = new MediatorLiveData<BrowseState>() {
             {
                 setValue(BrowseState.EMPTY);
-                addSource(mIsLoading, isLoading -> update());
                 addSource(mCurrentMediaItems, items -> update());
             }
 
@@ -96,15 +92,14 @@ public class MediaBrowserViewModelImpl extends AndroidViewModel implements
             }
 
             private BrowseState getState() {
-                Boolean isLoading = mIsLoading.getValue();
-                if (isLoading == null) {
+                if (mCurrentMediaItems.getValue() == null) {
                     // Uninitialized
                     return BrowseState.EMPTY;
                 }
-                if (isLoading) {
+                if (mCurrentMediaItems.getValue().isLoading()) {
                     return BrowseState.LOADING;
                 }
-                List<MediaItemMetadata> items = mCurrentMediaItems.getValue();
+                List<MediaItemMetadata> items = mCurrentMediaItems.getValue().getData();
                 if (items == null) {
                     // Normally this could be null if it hasn't been initialized, but in that case
                     // isLoading would not be false, so this means it must have encountered an
@@ -117,6 +112,7 @@ public class MediaBrowserViewModelImpl extends AndroidViewModel implements
                 return BrowseState.LOADED;
             }
         };
+
     }
 
     private static MediaBrowserCompat requireConnected(@Nullable MediaBrowserCompat mediaBrowser) {
@@ -164,23 +160,25 @@ public class MediaBrowserViewModelImpl extends AndroidViewModel implements
         return mBrowseState;
     }
 
-    @Override
-    public LiveData<Boolean> isLoading() {
-        return mIsLoading;
-    }
-
     /**
-     * Fetches the MediaItemMetadatas for the current browsed id. A MediaSource must be selected and
-     * its MediaBrowser connected, otherwise this will emit {@code null}. Will emit browse results
-     * if provided search query is {@code null}, and search query results otherwise.
+     * Fetches the MediaItemMetadatas for the current browsed id, and the loading status of the
+     * fetch operation.
      *
-     * @return a LiveData that emits the MediaItemMetadatas for the current search query or browsed
-     * id or {@code null} if unavailable.
+     * This LiveData will never emit {@code null}. If the data is loading, the data component of the
+     * {@link FutureData} will be null
+     * A MediaSource must be selected and its MediaBrowser connected, otherwise the FutureData will
+     * always contain a {@code null} data value.
+     *
+     * Will emit browse results if provided search query is {@code null},
+     * and search query results otherwise.
+     *
+     * @return a LiveData that emits a FutureData that contains the loading status and the
+     * MediaItemMetadatas for the current search query or browsed id
      * @see #setCurrentBrowseId(String)
      * @see #search(String)
      */
     @Override
-    public LiveData<List<MediaItemMetadata>> getBrowsedMediaItems() {
+    public LiveData<FutureData<List<MediaItemMetadata>>> getBrowsedMediaItems() {
         return mCurrentMediaItems;
     }
 }

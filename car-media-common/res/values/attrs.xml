@@ -30,4 +30,12 @@
     <declare-styleable name="FixedRatioImageView">
         <attr name="aspect_ratio" format="float"/>
     </declare-styleable>
+
+    <!-- Attributes for the MediaAppSelectorWidget. -->
+    <declare-styleable name="MediaAppSelectorWidget">
+        <!-- Whether the AppSelectionFragment opened by pressing the widget should be full screen.
+            -->
+        <attr name="fullScreenDialog" format="boolean"/>
+
+    </declare-styleable>
 </resources>

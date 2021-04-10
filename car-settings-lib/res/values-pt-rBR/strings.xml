@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+<string name="language_picker_list_suggested_header">"Sugeridos"</string>
+<string name="language_picker_list_all_header">"Todos os idiomas"</string>
+<string name="name_input_blank_error">"O campo não pode ficar em branco."</string>
+<string name="name_input_invalid_error">"O nome de usuário inserido é inválido."</string>
+</resources>

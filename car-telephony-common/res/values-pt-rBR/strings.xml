@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+<string name="unknown">"Desconhecido"</string>
+<string name="voicemail">"Correio de voz"</string>
+<string name="phone_label_with_info">" <xliff:g id="label" example="Mobile">%1$s</xliff:g> \" \u00B7 \" <xliff:g id="duration" example="1:20">%2$s</xliff:g> "</string>
+<string name="call_state_connecting">"Conectando..."</string>
+<string name="call_state_dialing">"Discando&#8230;"</string>
+<string name="call_state_hold">"Em espera  "</string>
+<string name="call_state_call_ended">"Chamada finalizada"</string>
+<string name="call_state_call_active">"Conectado"</string>
+<string name="call_state_call_ringing">"Tocando&#8230;"</string>
+<string name="call_state_call_ending">"Desconectando&#8230;"</string>
+</resources>

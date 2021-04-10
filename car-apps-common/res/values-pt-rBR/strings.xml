@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+<string name="car_drawer_open">"Abrir gaveta"</string>
+<string name="car_drawer_close">"Fechar gaveta"</string>
+<string name="restricted_while_driving">"Recurso não disponível ao dirigir."</string>
+<string name="scroll_bar_page_down_button">"Rolar para baixo"</string>
+<string name="scroll_bar_page_up_button">"Rolar para cima"</string>
+</resources>
